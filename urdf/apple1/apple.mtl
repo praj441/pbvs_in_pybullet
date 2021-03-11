@@ -1,0 +1,12 @@
+# Blender MTL File: 'None'
+# Material Count: 1
+
+newmtl apple
+Ns 0
+Ka 1.000000 1.000000 1.000000
+Kd 0.8 0.8 0.8
+Ks 0.8 0.8 0.8
+d 1
+illum 0
+map_Kd apple.png
+map_Ka apple.png
