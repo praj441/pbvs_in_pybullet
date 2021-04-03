@@ -4,7 +4,7 @@ import time
 import numpy as np
 from math import *
 
-from camera import get_image
+from camera import get_image, cam_pose_to_world_pose
 from sphere_fitting import sphereFit
 from cam_ik import accurateIK
 
@@ -98,7 +98,7 @@ cubeStartPos = [0,0,0]
 cubeStartOrientation = p.getQuaternionFromEuler([0,0,0])
 boxId = p.loadURDF("table/table.urdf",cubeStartPos, cubeStartOrientation)
 # appleId = p.loadURDF("apple.urdf",[0.0,0.0,0.625])
-appleId = p.loadURDF("urdf/apple1/apple.urdf",[0.0,0.0,0.7],useFixedBase=1)
+appleId = p.loadURDF("urdf/apple1/apple.urdf",[0.0,0.2,0.7],useFixedBase=0)
 kukaId = p.loadURDF("ur_description/urdf/ur10_robot.urdf",[-0.6,0,0.625], cubeStartOrientation)
 roboId = kukaId
 required_joints = [0,-1.9,1.9,-1.57,-1.57,0,0]
@@ -131,8 +131,12 @@ def pix_to_ee_frame(x_pix,y_pix,d):
   Yc = (y_pix - (height/2))*(d/(f_y))
 
   Xe = Zc 
-  Ye = Xc
-  Ze = Yc
+  Ye = -Xc
+  Ze = -Yc
+
+  # Xe = Xc 
+  # Ye = Yc
+  # Ze = Zc
   return(Xe,Ye,Ze)
 
 def test_jecobian(kukaId):
@@ -207,8 +211,8 @@ def mask_points(Sbuf,Dbuf,appleId):
     Zl = []
     for i in range(width):
         for j in range(height):
-            if S[i][j] == appleId:
-                x,y,z = pix_to_ee_frame(i,j,D[i][j])
+            if S[j][i] == appleId:
+                x,y,z = pix_to_ee_frame(i,j,D[j][i])
                 Xl.append(x)
                 Yl.append(y)
                 Zl.append(z)
@@ -217,7 +221,7 @@ def mask_points(Sbuf,Dbuf,appleId):
 
 
 # accurateIK(roboId,7,pos2,ort2,useNullSpace=False)
-dpos = np.array((0.0,0.0,0.0))
+dpos = np.array((0.2,0.0,0.0))
 def visual_servo_control(pos,ort):
     lmd = 5
     # print(np.shape(pos),np.shape(ort))
@@ -237,7 +241,7 @@ def visual_servo_control(pos,ort):
     # Qc = p.getQuaternionFromEuler(Wc)
     # Vc,c = relative_ee_pose_to_ee_world_pose1(roboId,Vc,Qc)
     V = np.concatenate((Vc,Wc))
-    print(pos)
+    # print(pos)
     return V
 
 I,Dbuf,Sbuf = get_image(kukaId)
@@ -246,6 +250,8 @@ r,cx,cy,cz = sphereFit(sx,sy,sz)
 pos = np.array((cx,cy,cz))[:,0]
 ort = np.array((0.0,0.0,0.0))
 # pos2,ort2 = relative_ee_pose_to_ee_world_pose1(roboId,pos,cubeStartOrientation)
+# accurateIK(roboId,7,pos2,ort2,useNullSpace=False)
+# c = input('press enter to end')
 Ve = visual_servo_control(pos,ort)
 
 for i in range (10000):
@@ -254,22 +260,37 @@ for i in range (10000):
     # if i%20==0:
     I,Dbuf,Sbuf = get_image(kukaId)
     sx,sy,sz = mask_points(Sbuf,Dbuf,appleId)
+    # sz = sz - 0.1
     r,cx,cy,cz = sphereFit(sx,sy,sz)
+    # cx = np.array(sx).mean()
+    # cy = np.array(sy).mean()
+    # cz = np.array(sz).mean()
     pos = np.array((cx,cy,cz))[:,0]
+    error = np.sqrt(np.mean((pos-dpos)**2))
+    if error < 0.00045:
+      break
+
+    print(pos,error)
     ort = np.array((0.0,0.0,0.0))
     Ve = visual_servo_control(pos,ort)
     pos = 0.01*Ve[0:3]
+    # pos[1] = pos[1] / 2
     rot = 0.01*Ve[3:6]
     ort = p.getQuaternionFromEuler(rot)
+    # pos2,ort2 = cam_pose_to_world_pose(pos,roboId)
     pos2,ort2 = relative_ee_pose_to_ee_world_pose1(roboId,pos,ort)
+    # pos2_new = (pos2[0],pos2[1],pos2[2])
+
     accurateIK(roboId,7,pos2,ort2,useNullSpace=False)
+    
     # run_ee_link(kukaId,Ve)
       # run_ee_link(kukaId,np.array((1.0,0.0,0.0,0.0,0.0,0.0)))
     # I,Dbuf,Sbuf = get_image(kukaId)
     # sx,sy,sz = mask_points(Sbuf,Dbuf,appleId)
     # r,cx,cy,cz = sphereFit(sx,sy,sz)
     # print(r,cx,cy,cz)
+c = input('press enter to end')
 cubePos, cubeOrn = p.getBasePositionAndOrientation(boxId)
-print(cubePos,cubeOrn)
+# print(cubePos,cubeOrn)
 p.disconnect()
 

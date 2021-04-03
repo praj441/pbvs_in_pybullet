@@ -15,6 +15,29 @@ width = 200
 height = 200
 pi=3.14159265359
 
+default_orn = p.getQuaternionFromEuler([0,0,0])
+
+def cam_to_ee_calibration(pos,orn):
+	# print('cam',x,y,z,rx,ry,rz)
+	eu = p.getEulerFromQuaternion(orn)
+	#camera to ee calibration
+	xe = pos[2] 
+	ye = -pos[0]
+	ze = -pos[1]
+	rxe = eu[2]
+	rye = -eu[0]
+	rze = -eu[1]
+	p2 = [xe,ye,ze]
+	q2 = p.getQuaternionFromEuler([rxe,rye,rze])
+	return p2,q2
+
+def cam_pose_to_world_pose(camTargetPos,robotID,camTargetOrn=default_orn):
+	epos,eorn = cam_to_ee_calibration(camTargetPos,camTargetOrn)
+	cam_link_state = p.getLinkState(robotID,linkIndex=7,computeForwardKinematics=1)
+	pos=cam_link_state[-2]
+	ort=cam_link_state[-1]
+	return p.multiplyTransforms(pos,ort,epos,eorn)
+
 def get_image(robotID,width=200,height=200):
 	cam_link_state = p.getLinkState(robotID,linkIndex=7,computeForwardKinematics=1)
 	pos=cam_link_state[-2]
